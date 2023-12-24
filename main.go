@@ -1,83 +1,80 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
-	"net/http"
+	"log"
+	"pustaka-api/book"
+	"pustaka-api/handler"
 
 	"github.com/gin-gonic/gin"
-	"github.com/go-playground/validator/v10"
+	"gorm.io/driver/mysql"
+	"gorm.io/gorm"
 )
 
 func main() {
-	router := gin.Default()
+	dsn := "root:@tcp(127.0.0.1:3306)/pustaka-api?charset=utf8mb4&parseTime=True&loc=Local"
+	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
 
-	router.GET("/", rootHandler)
-	router.GET("/hello", helloHandler)
-	router.GET("/books/:id/:title", booksHandler)
-	router.GET("/query", queryHandler)
-	router.POST("/books", postBooksHandler)
-
-	router.Run()
-}
-
-func rootHandler(ctx *gin.Context) {
-	ctx.JSON(http.StatusOK, gin.H{
-		"name": "Reza Alfara",
-		"bio":  "A Software Engineer",
-	})
-}
-
-func helloHandler(ctx *gin.Context) {
-	ctx.JSON(http.StatusOK, gin.H{
-		"title":    "Hello World",
-		"subtitle": "Belajar golang bareng Reza Alfara",
-	})
-}
-
-func booksHandler(ctx *gin.Context) {
-	id := ctx.Param("id")
-	title := ctx.Param("title")
-
-	ctx.JSON(http.StatusOK, gin.H{"id": id, "title": title})
-}
-
-func queryHandler(ctx *gin.Context) {
-	title := ctx.Query("title")
-	price := ctx.Query("price")
-
-	ctx.JSON(http.StatusOK, gin.H{"title": title, "price": price})
-}
-
-type BookInput struct {
-	Title string      `json:"title" binding:"required"`
-	Price json.Number `json:"price" binding:"required,number"`
-}
-
-func postBooksHandler(ctx *gin.Context) {
-	var bookInput BookInput
-
-	err := ctx.ShouldBindJSON(&bookInput)
 	if err != nil {
-		if validationErrs, ok := err.(validator.ValidationErrors); ok {
-			// Handle validation errors
-			var errorMessages []string
-			for _, e := range validationErrs {
-				errorMessage := fmt.Sprintf("Error on field %s, condition: %s", e.Field(), e.ActualTag())
-				errorMessages = append(errorMessages, errorMessage)
-			}
-			ctx.JSON(http.StatusBadRequest, gin.H{"errors": errorMessages})
-			return
-		}
-
-		// Handle other errors
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
+		log.Fatal("Db connection error")
 	}
 
-	ctx.JSON(http.StatusOK, gin.H{
-		"title": bookInput.Title,
-		"price": bookInput.Price,
-	})
+	db.AutoMigrate(&book.Book{})
+	//CRUD
 
+	//===========
+	//Create Data
+	//===========
+
+	// book := book.Book{}
+	// book.Title = "Buku baru"
+	// book.Price = 5000
+	// book.Discount = 80
+	// book.Rating = 3
+	// book.Description = "Ini adalah buku baru"
+
+	// err = db.Create(&book).Error
+	// if err != nil {
+	// 	fmt.Println("==========================")
+	// 	fmt.Println("Error creating book record")
+	// 	fmt.Println("==========================")
+	// }
+
+	//Read data
+	var book book.Book
+	err = db.Debug().Where("id = ?", 1).First(&book).Error
+	if err != nil {
+		fmt.Println("==========================")
+		fmt.Println("Error finding book record")
+		fmt.Println("==========================")
+	}
+
+	//Update data
+	// book.Title = "Man Tiger (Revised Edition)"
+	// err = db.Save(&book).Error
+	// if err != nil {
+	// 	fmt.Println("==========================")
+	// 	fmt.Println("Error updating book record")
+	// 	fmt.Println("==========================")
+	// }
+
+	//Delete data
+	err = db.Delete(&book).Error
+	if err != nil {
+		fmt.Println("==========================")
+		fmt.Println("Error deleting book record")
+		fmt.Println("==========================")
+	}
+
+	router := gin.Default()
+
+	v1 := router.Group("/v1")
+
+	v1.GET("/", handler.RootHandler)
+	v1.GET("/hello", handler.HelloHandler)
+	v1.GET("/books/:id/:title", handler.BooksHandler)
+	v1.GET("/query", handler.QueryHandler)
+	v1.POST("/books", handler.PostBooksHandler)
+
+	router.Run()
 }
